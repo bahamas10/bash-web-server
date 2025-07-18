@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 #
-# Bash HTTP Server in Pure Bash
+# Bash HTTP Server in Pure Bash.
+#
+# Watch how this was made on YouTube:
+# - https://youtu.be/L967hYylZuc
 #
 # Author: Dave Eddy <dave@daveeddy.com>
 # Date: July 08, 2025
