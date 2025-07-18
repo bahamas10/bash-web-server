@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+s="GET /foo.txt HTTP/1.1
+Host: localhost:8080
+User-Agent: curl/8.7.1
+Accept: */*"
+
+parse-request() {
+	declare -gA REQ_INFO=()
+	declare -gA REQ_HEADERS=()
+
+	local state='status'
+	local line
+	while read -r line; do
+		line=${line%$'\r'}
+		echo "processing line: $line"
+
+		case "$state" in
+			'status')
+				# parse the status line
+				# "GET /foo.txt HTTP/1.1"
+				local method path version
+				read -r method path version <<< "$line"
+				REQ_INFO[method]=$method
+				REQ_INFO[path]=$path
+				REQ_INFO[version]=$version
+				state='headers'
+				;;
+			'headers')
+				# parse the headers
+				if [[ -z $line ]]; then
+					# XXX this doesn't support body parsing
+					break
+				fi
+				local key value
+				IFS=: read -r key value <<< "$line"
+				key=${key,,}
+				value=${value# *}
+				REQ_HEADERS[$key]=$value
+				;;
+			'body')
+				fatal 'body parsing not supported'
+				;;
+		esac
+	done
+}
+
+parse-request <<< "$s"
+
+echo "REQ_INFO"
+for key in "${!REQ_INFO[@]}"; do
+	value=${REQ_INFO[$key]}
+	echo "$key => $value"
+done
+
+echo "REQ_HEADERS"
+for key in "${!REQ_HEADERS[@]}"; do
+	value=${REQ_HEADERS[$key]}
+	echo "$key => $value"
+done

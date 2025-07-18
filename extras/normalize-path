@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+normalize-path() {
+	local path=/$1
+
+	local parts
+	IFS='/' read -r -a parts <<< "$path"
+
+	local -a part
+	local -a out=()
+	for part in "${parts[@]}"; do
+		case "$part" in
+			'') ;; # ignore empty directories (multiple /)
+			'.') ;; # ignore current directory
+			'..') unset 'out[-1]' 2>/dev/null;;
+			*) out+=("$part");;
+		esac
+	done
+
+	local s
+	s=$(IFS=/; echo "${out[*]}")
+	echo "/$s"
+}
+
+normalize-path '../../../../../../../etc/passwd'
+# '/etc/passwd'
+
+normalize-path '/./.././.././//././//./././tmp/././././'
+# '/tmp'
+
+normalize-path '/usr/bin/../lib//./'
+# '/usr/lib'
