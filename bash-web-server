@@ -95,8 +95,8 @@ normalize-path() {
 	local parts
 	IFS='/' read -r -a parts <<< "$path"
 
-	local -a part
 	local -a out=()
+	local part
 	for part in "${parts[@]}"; do
 		case "$part" in
 			'') ;; # ignore empty directories (multiple /)
