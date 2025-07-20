@@ -59,10 +59,16 @@ list-directory() {
 	echo '<ul>'
 	local f
 	for f in .. "$d"/*; do
-		f=${f##*/}
+		local bname=${f##*/}
+		local display_name
+		if [[ -d $f ]]; then
+			display_name="📁 $bname/"
+		else
+			display_name="📄 $bname"
+		fi
 		printf '<li><a href="%s">%s</a></li>\n' \
-			"$(urlencode "$f")" \
-			"$(html-encode "$f")"
+			"$(urlencode "$bname")" \
+			"$(html-encode "$display_name")"
 	done
 	echo '</ul>'
 	echo '<hr>'
@@ -224,7 +230,7 @@ process-request() {
 		fi
 		# try a directory listing
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
-		printf 'Content-Type: text/html\r\n' >&"$fd"
+		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 		list-directory "$path" >&"$fd"
 	else
