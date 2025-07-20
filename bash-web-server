@@ -229,14 +229,15 @@ process-request() {
 		printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
 		printf '\r\n' >&"$fd"
 		tee < "$file" >&"$fd"
-  	elif [[ -d $path ]]; then
-	# redirect to /path/ if directory requested without trailing slash
+	elif [[ -d $path ]]; then
+		# redirect to /path/ if directory requested without trailing slash
 		if [[ ${REQ_INFO[path]} != */ ]]; then
 			printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
 			printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
 			printf '\r\n' >&"$fd"
 			return
 		fi
+
 		# try a directory listing
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
 		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
