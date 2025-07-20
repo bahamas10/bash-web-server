@@ -184,6 +184,32 @@ normalize-path() {
 	echo "/$s"
 }
 
+resolve-path() {
+	# "/././foo%20bar.txt?query=whatever"
+	local path="$1"
+
+	# "././foo%20bar.txt?query=whatever"
+	path=${path:1}
+
+	# "././foo%20bar.txt"
+	local query
+	IFS='?' read -r path query <<< "$path"
+
+	# "././foo bar.txt"
+	path=$(urldecode "$path")
+
+	# "/foo bar.txt"
+	path=$(normalize-path "$path")
+
+	# "foo bar.txt"
+	path=${path:1}
+
+	# handle empty path (root path)
+	path=${path:-.}
+
+	echo "$path"
+}
+
 parse-request() {
 	declare -gA REQ_INFO=()
 	declare -gA REQ_HEADERS=()
@@ -239,27 +265,7 @@ process-request() {
 	echo "${REQ_INFO[method]} ${REQ_INFO[path]}"
 
 	# if we are here, we should reply to the caller
-	# "/././foo%20bar.txt?query=whatever"
-	local path="${REQ_INFO[path]}"
-
-	# "././foo%20bar.txt?query=whatever"
-	path=${path:1}
-
-	# "././foo%20bar.txt"
-	local query
-	IFS='?' read -r path query <<< "$path"
-
-	# "././foo bar.txt"
-	path=$(urldecode "$path")
-
-	# "/foo bar.txt"
-	path=$(normalize-path "$path")
-
-	# "foo bar.txt"
-	path=${path:1}
-
-	# handle empty path (root path)
-	path=${path:-.}
+	local path=$(resolve-path "${REQ_INFO[path]}")
 
 	# try to serve an index page
 	local totry=(
