@@ -197,9 +197,9 @@ process-request() {
 
 	# validate the request
 	[[ ${REQ_INFO[version]} == 'HTTP/1.1' ]] \
-	    || fatal 'unsupported HTTP version'
+	    || fatal "unsupported HTTP version: '${REQ_INFO[version]}'"
 	[[ ${REQ_INFO[method]} == 'GET' ]] \
-	    || fatal 'unsupported HTTP method'
+	    || fatal "unsupported HTTP method: '${REQ_INFO[method]}'"
 	[[ ${REQ_INFO[path]} == /* ]] \
 	    || fatal 'path must be absolute'
 
@@ -247,6 +247,7 @@ process-request() {
 		local mime
 		mime=$(mime-type "$file")
 
+		echo "  serving file '$file'"
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
 		printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
 		printf '\r\n' >&"$fd"
@@ -254,6 +255,7 @@ process-request() {
 	elif [[ -d $path ]]; then
 		# redirect to /path/ if directory requested without trailing slash
 		if [[ ${REQ_INFO[path]} != */ ]]; then
+			echo "  serving redirect '${REQ_INFO[path]}'"
 			printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
 			printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
 			printf '\r\n' >&"$fd"
@@ -261,12 +263,14 @@ process-request() {
 		fi
 
 		# try a directory listing
+		echo "  serving dir listing '$path'"
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
 		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 		list-directory "$path" >&"$fd"
 	else
 		# nothing was found
+		echo "  serving nothing"
 		printf 'HTTP/1.1 404 Not Found\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 	fi
@@ -286,10 +290,10 @@ main() {
 		esac
 	done
 
-	cd "$DIR" || fatal "failed to move to $DIR"
+	cd "$DIR" || fatal "failed to move to '$DIR'"
 
 	echo "listening on http://$ADDRESS:$PORT"
-	echo "serving out of $DIR"
+	echo "serving out of '$DIR'"
 
 	local fd ip
 	while true; do
