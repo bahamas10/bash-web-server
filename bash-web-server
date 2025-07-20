@@ -53,6 +53,13 @@ list-directory() {
 
 	shopt -s nullglob dotglob
 
+	echo '<!DOCTYPE html>'
+	echo '<html lang="en">'
+	echo '<head>'
+	echo '  <meta charset="utf-8">'
+	printf '  <title>Index of %s</title>\n' "$(html-encode "$d")"
+	echo '</head>'
+	echo '<body>'
 	echo '<h1>Directory Listing</h1>'
 	echo "<h2>Directory: $(html-encode "$d")</h2>"
 	echo '<hr>'
@@ -72,6 +79,8 @@ list-directory() {
 	done
 	echo '</ul>'
 	echo '<hr>'
+	echo '</body>'
+	echo '</html>'
 }
 
 urlencode() {
