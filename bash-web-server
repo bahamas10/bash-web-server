@@ -53,19 +53,34 @@ list-directory() {
 
 	shopt -s nullglob dotglob
 
+	echo '<!DOCTYPE html>'
+	echo '<html lang="en">'
+	echo '<head>'
+	echo '  <meta charset="utf-8">'
+	printf '  <title>Index of %s</title>\n' "$(html-encode "$d")"
+	echo '</head>'
+	echo '<body>'
 	echo '<h1>Directory Listing</h1>'
 	echo "<h2>Directory: $(html-encode "$d")</h2>"
 	echo '<hr>'
 	echo '<ul>'
 	local f
 	for f in .. "$d"/*; do
-		f=${f##*/}
+		local bname=${f##*/}
+		local display_name
+		if [[ -d $f ]]; then
+			display_name="📁 $bname/"
+		else
+			display_name="📄 $bname"
+		fi
 		printf '<li><a href="%s">%s</a></li>\n' \
-			"$(urlencode "$f")" \
-			"$(html-encode "$f")"
+			"$(urlencode "$bname")" \
+			"$(html-encode "$display_name")"
 	done
 	echo '</ul>'
 	echo '<hr>'
+	echo '</body>'
+	echo '</html>'
 }
 
 urlencode() {
@@ -214,10 +229,17 @@ process-request() {
 		printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
 		printf '\r\n' >&"$fd"
 		tee < "$file" >&"$fd"
-	elif [[ -d $path ]]; then
+  	elif [[ -d $path ]]; then
+	# redirect to /path/ if directory requested without trailing slash
+		if [[ ${REQ_INFO[path]} != */ ]]; then
+			printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
+			printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
+			printf '\r\n' >&"$fd"
+			return
+		fi
 		# try a directory listing
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
-		printf 'Content-Type: text/html\r\n' >&"$fd"
+		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 		list-directory "$path" >&"$fd"
 	else
