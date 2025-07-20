@@ -40,13 +40,35 @@ mime-type() {
 	[[ $bname == "$ext" ]] && ext=
 
 	case "$ext" in
-		html|htm) echo 'text/html';;
-		jpeg|jpg) echo 'image/jpeg';;
-		png) echo 'image/png';;
-		txt) echo 'text/plain';;
 		css) echo 'text/css';;
+		csv) echo 'text/csv';;
+		eot) echo 'application/vnd.ms-fontobject';;
+		gif) echo 'image/gif';;
+		gz) echo 'application/gzip';;
+		html|htm) echo 'text/html';;
+		ico) echo 'image/x-icon';;
+		jpeg|jpg) echo 'image/jpeg';;
 		js) echo 'text/javascript';;
 		json) echo 'application/json';;
+		md) echo 'text/markdown';;
+		mp3) echo 'audio/mpeg';;
+		mp4) echo 'video/mp4';;
+		ogg) echo 'audio/ogg';;
+		otf) echo 'font/otf';;
+		pdf) echo 'application/pdf';;
+		png) echo 'image/png';;
+		rar) echo 'application/vnd.rar';;
+		svg) echo 'image/svg+xml';;
+		tar) echo 'application/x-tar';;
+		ttf) echo 'font/ttf';;
+		txt) echo 'text/plain';;
+		wav) echo 'audio/wav';;
+		webm) echo 'video/webm';;
+		webp) echo 'image/webp';;
+		woff) echo 'font/woff';;
+		woff2) echo 'font/woff2';;
+		xml) echo 'application/xml';;
+		zip) echo 'application/zip';;
 		*) echo 'application/octet-stream';;
 	esac
 }
