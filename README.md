@@ -5,6 +5,14 @@ An HTTP server in Pure Bash.
 
 Watch how it was made on [YouTube](https://www.youtube.com/watch?v=L967hYylZuc).
 
+Installation
+-----
+For some Debian-based systems, an additional package 'bash-builtins' may be required: 
+
+```
+apt install bash-builtins
+```
+
 Usage
 -----
 
