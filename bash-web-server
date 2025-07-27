@@ -25,13 +25,35 @@ mime-type() {
 	[[ $bname == "$ext" ]] && ext=
 
 	case "$ext" in
-		html|htm) echo 'text/html';;
-		jpeg|jpg) echo 'image/jpeg';;
-		png) echo 'image/png';;
-		txt) echo 'text/plain';;
 		css) echo 'text/css';;
+		csv) echo 'text/csv';;
+		eot) echo 'application/vnd.ms-fontobject';;
+		gif) echo 'image/gif';;
+		gz) echo 'application/gzip';;
+		html|htm) echo 'text/html';;
+		ico) echo 'image/x-icon';;
+		jpeg|jpg) echo 'image/jpeg';;
 		js) echo 'text/javascript';;
 		json) echo 'application/json';;
+		md) echo 'text/markdown';;
+		mp3) echo 'audio/mpeg';;
+		mp4) echo 'video/mp4';;
+		ogg) echo 'audio/ogg';;
+		otf) echo 'font/otf';;
+		pdf) echo 'application/pdf';;
+		png) echo 'image/png';;
+		rar) echo 'application/vnd.rar';;
+		svg) echo 'image/svg+xml';;
+		tar) echo 'application/x-tar';;
+		ttf) echo 'font/ttf';;
+		txt) echo 'text/plain';;
+		wav) echo 'audio/wav';;
+		webm) echo 'video/webm';;
+		webp) echo 'image/webp';;
+		woff) echo 'font/woff';;
+		woff2) echo 'font/woff2';;
+		xml) echo 'application/xml';;
+		zip) echo 'application/zip';;
 		*) echo 'application/octet-stream';;
 	esac
 }
@@ -46,6 +68,124 @@ html-encode() {
 	s=${s//\'/\&apos;}
 
 	echo "$s"
+}
+
+file-as-base64() {
+	# code written by ChatGPT
+	# this code uses xxd, tr, bc and seq.
+	# on my system (ubuntu 24) only seq is build-in.
+	# it's really slow, around 40sec for https://ysap.sh/static/ysap.png
+	# maybe just use base64 directly:
+	   echo $(base64 -w 0 "$1"); return
+
+	FILE="$1"
+	if [[ ! -f "$FILE" ]]; then
+		echo "File not found: $FILE"
+		exit 1
+	fi
+
+	BASE64_CHARS="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+	# Convert file to raw hex
+	hex=$(xxd -p -c 999999 "$FILE" | tr -d '\n')
+
+	# Convert hex to binary
+	binstr=""
+	for ((i=0; i<${#hex}; i+=2)); do
+		byte="${hex:i:2}"
+		dec=$((16#$byte)) # convert hex to decimal
+		binbyte=$(printf "%08d" "$(echo "obase=2; $dec" | bc)")
+		binstr+="$binbyte"
+	done
+
+	# Pad to make length divisible by 6
+	pad=$(( (6 - ${#binstr} % 6) % 6 ))
+	binstr+=$(printf '0%.0s' $(seq 1 $pad))
+
+	# Process 6-bit chunks
+	output=""
+	for ((i=0; i<${#binstr}; i+=6)); do
+		chunk="${binstr:i:6}"
+		if [[ "$chunk" =~ ^[01]{6}$ ]]; then
+			index=$((2#$chunk))
+			output+=${BASE64_CHARS:index:1}
+		else
+			echo "Invalid binary chunk: $chunk"
+			exit 1
+		fi
+	done
+
+	# Add padding '=' characters
+	if [[ $pad -eq 2 ]]; then
+		output+="="
+	elif [[ $pad -eq 4 ]]; then
+		output+="=="
+	fi
+
+	echo "$output"
+}
+
+inline-assets() {
+    local html="$1"
+
+	local -A replacement=(
+		# inline stylesheets
+		["style||1"]="<link[^>]*rel=\"stylesheet\"[^>]*href=\"([^\"]+)\"[^>]*/?>"
+		["style||2"]="<link[^>]*href=\"([^\"]+)\"[^>]*rel=\"stylesheet\"[^>]*/?>"
+		# inline images
+		["img|src"]="<img[^>]*src=\"([^\"]+)\"[^>]*>"
+		# inline favicons
+		["img|href|1"]="<link[^>]*rel=\"(shortcut )?icon( shortcut)?\"[^>]*href=\"([^\"]+)\"[^>]*/?>"
+		["img|href|2"]="<link[^>]*href=\"([^\"]+)\"[^>]*rel=\"(shortcut )?icon( shortcut)?\"[^>]*/?>"
+		# inline script
+		["script"]="<script[^>]*src=\"([^\"]+)\"[^>]*><\/script>"
+	)
+
+	# sorting as above, arrays are unsorted per default?
+	local keys=({"style||1","style||2","img|src","img|href|1","img|href|2","script"})
+
+	for key in ${keys[@]}; do
+		local new_html=""
+
+		while [[ "$html" =~ ${replacement[${key}]} ]]; do
+			local tag="${BASH_REMATCH[0]}"
+			local raw_path="${BASH_REMATCH[1]}"
+ 			local before="${html%%$tag*}"
+    		local after="${html#*$tag}"
+
+			local fixed_path=$(resolve-path "$raw_path")
+
+			if [[ ! -f "$fixed_path" ]]; then
+				new_html+="$before$tag"
+				html="$after"
+				continue
+			fi
+
+			local tag_name attr version
+			IFS='|' read -r tag_name attr version <<< "$key"
+
+			local new_tag
+			if [[ $tag_name == "img"* ]]; then
+				local mime_type=$(mime-type "$fixed_path")
+				local base64_data=$(file-as-base64 "$fixed_path")
+				local content="data:$mime_type;base64,$base64_data"
+
+				# update existing tag, instead of fully replacing
+				new_tag="${tag/$attr=\"$raw_path\"/$attr=\"$content\" original-path=\"$raw_path\"}"
+			else
+				local content=$(tee < "$fixed_path")
+
+				# replace tag
+				new_tag="<$tag_name original-path=\"$raw_path\">$content</$tag_name>"
+			fi
+
+			new_html+="$before$new_tag"
+			html="$after"
+		done
+		html="$new_html$html"
+	done
+
+    echo "$html"
 }
 
 list-directory() {
@@ -129,6 +269,32 @@ normalize-path() {
 	echo "/$s"
 }
 
+resolve-path() {
+	# "/././foo%20bar.txt?query=whatever"
+	local path="$1"
+
+	# "././foo%20bar.txt?query=whatever"
+	path=${path:1}
+
+	# "././foo%20bar.txt"
+	local query
+	IFS='?' read -r path query <<< "$path"
+
+	# "././foo bar.txt"
+	path=$(urldecode "$path")
+
+	# "/foo bar.txt"
+	path=$(normalize-path "$path")
+
+	# "foo bar.txt"
+	path=${path:1}
+
+	# handle empty path (root path)
+	path=${path:-.}
+
+	echo "$path"
+}
+
 parse-request() {
 	declare -gA REQ_INFO=()
 	declare -gA REQ_HEADERS=()
@@ -175,36 +341,16 @@ process-request() {
 
 	# validate the request
 	[[ ${REQ_INFO[version]} == 'HTTP/1.1' ]] \
-	    || fatal 'unsupported HTTP version'
+	    || fatal "unsupported HTTP version: '${REQ_INFO[version]}'"
 	[[ ${REQ_INFO[method]} == 'GET' ]] \
-	    || fatal 'unsupported HTTP method'
+	    || fatal "unsupported HTTP method: '${REQ_INFO[method]}'"
 	[[ ${REQ_INFO[path]} == /* ]] \
 	    || fatal 'path must be absolute'
 
 	echo "${REQ_INFO[method]} ${REQ_INFO[path]}"
 
 	# if we are here, we should reply to the caller
-	# "/././foo%20bar.txt?query=whatever"
-	local path="${REQ_INFO[path]}"
-
-	# "././foo%20bar.txt?query=whatever"
-	path=${path:1}
-
-	# "././foo%20bar.txt"
-	local query
-	IFS='?' read -r path query <<< "$path"
-
-	# "././foo bar.txt"
-	path=$(urldecode "$path")
-
-	# "/foo bar.txt"
-	path=$(normalize-path "$path")
-
-	# "foo bar.txt"
-	path=${path:1}
-
-	# handle empty path (root path)
-	path=${path:-.}
+	local path=$(resolve-path "${REQ_INFO[path]}")
 
 	# try to serve an index page
 	local totry=(
@@ -225,13 +371,21 @@ process-request() {
 		local mime
 		mime=$(mime-type "$file")
 
+		echo "  serving file '$file'"
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
 		printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
 		printf '\r\n' >&"$fd"
-		tee < "$file" >&"$fd"
+		if [[ $mime == 'text/html' ]]; then
+			local content=$(tee < "$file")
+			content=$(inline-assets "$content")
+			echo "$content" >&"$fd"
+		else
+			tee < "$file" >&"$fd"
+		fi
 	elif [[ -d $path ]]; then
 		# redirect to /path/ if directory requested without trailing slash
 		if [[ ${REQ_INFO[path]} != */ ]]; then
+			echo "  serving redirect '${REQ_INFO[path]}'"
 			printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
 			printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
 			printf '\r\n' >&"$fd"
@@ -239,12 +393,14 @@ process-request() {
 		fi
 
 		# try a directory listing
+		echo "  serving dir listing '$path'"
 		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
 		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 		list-directory "$path" >&"$fd"
 	else
 		# nothing was found
+		echo "  serving nothing"
 		printf 'HTTP/1.1 404 Not Found\r\n' >&"$fd"
 		printf '\r\n' >&"$fd"
 	fi
@@ -264,10 +420,10 @@ main() {
 		esac
 	done
 
-	cd "$DIR" || fatal "failed to move to $DIR"
+	cd "$DIR" || fatal "failed to move to '$DIR'"
 
 	echo "listening on http://$ADDRESS:$PORT"
-	echo "serving out of $DIR"
+	echo "serving out of '$DIR'"
 
 	local fd ip
 	while true; do
