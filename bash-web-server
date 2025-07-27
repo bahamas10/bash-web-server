@@ -108,7 +108,8 @@ urldecode() {
 }
 
 normalize-path() {
-	local path=/$1
+	# $1 is garanteed to begin with a '/'
+	local path=$1
 
 	local parts
 	IFS='/' read -r -a parts <<< "$path"
@@ -126,7 +127,7 @@ normalize-path() {
 
 	local s
 	s=$(IFS=/; echo "${out[*]}")
-	echo "/$s"
+	echo "$s"
 }
 
 parse-request() {
@@ -187,21 +188,15 @@ process-request() {
 	# "/././foo%20bar.txt?query=whatever"
 	local path="${REQ_INFO[path]}"
 
-	# "././foo%20bar.txt?query=whatever"
-	path=${path:1}
-
-	# "././foo%20bar.txt"
+	# "/././foo%20bar.txt"
 	local query
 	IFS='?' read -r path query <<< "$path"
 
-	# "././foo bar.txt"
+	# "/././foo bar.txt"
 	path=$(urldecode "$path")
 
-	# "/foo bar.txt"
-	path=$(normalize-path "$path")
-
 	# "foo bar.txt"
-	path=${path:1}
+	path=$(normalize-path "$path")
 
 	# handle empty path (root path)
 	path=${path:-.}
