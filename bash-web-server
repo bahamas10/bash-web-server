@@ -58,6 +58,13 @@ list-directory() {
 	echo '<head>'
 	echo '  <meta charset="utf-8">'
 	printf '  <title>Index of %s</title>\n' "$(html-encode "$d")"
+	echo '  <style>'
+	echo '  body {'
+	echo '    background-color: Canvas;'
+	echo '    color: CanvasText;'
+	echo '    color-scheme: light dark;'
+	echo '  }'
+	echo '  </style>'
 	echo '</head>'
 	echo '<body>'
 	echo '<h1>Directory Listing</h1>'
