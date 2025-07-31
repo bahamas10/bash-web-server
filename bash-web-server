@@ -64,6 +64,9 @@ list-directory() {
 	echo '    color: CanvasText;'
 	echo '    color-scheme: light dark;'
 	echo '  }'
+	echo '  a, a:visited, a:active {'
+	echo '    text-decoration: none;'
+	echo '  }'
 	echo '  </style>'
 	echo '</head>'
 	echo '<body>'
@@ -274,7 +277,7 @@ main() {
 	cd "$DIR" || fatal "failed to move to $DIR"
 
 	echo "listening on http://$ADDRESS:$PORT"
-	echo "serving out of $DIR"
+	echo "serving out of $PWD"
 
 	local fd ip
 	while true; do

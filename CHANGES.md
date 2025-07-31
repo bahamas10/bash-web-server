@@ -3,7 +3,10 @@ Changelog
 
 ## Not Yet Released
 
-(nothing)
+- https://github.com/bahamas10/bash-web-server/pull/7 - add dark mode to
+  directory listing
+- directory listing styling - no underline on static links
+- use `$PWD` to show the directory we are serving out of when starting
 
 ## v1.0.1
 
