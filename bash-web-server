@@ -203,84 +203,101 @@ parse-request() {
 
 process-request() {
 	local fd=$1
+	local keep_alive=0
 
-	parse-request <&"$fd"
+	while [[ true ]]; do
+		((keep_alive++))
+		parse-request <&"$fd"
 
-	# validate the request
-	[[ ${REQ_INFO[version]} == 'HTTP/1.1' ]] \
-	    || fatal 'unsupported HTTP version'
-	[[ ${REQ_INFO[method]} == 'GET' ]] \
-	    || fatal 'unsupported HTTP method'
-	[[ ${REQ_INFO[path]} == /* ]] \
-	    || fatal 'path must be absolute'
-
-	echo "${REQ_INFO[method]} ${REQ_INFO[path]}"
-
-	# if we are here, we should reply to the caller
-	# "/././foo%20bar.txt?query=whatever"
-	local path="${REQ_INFO[path]}"
-
-	# "././foo%20bar.txt?query=whatever"
-	path=${path:1}
-
-	# "././foo%20bar.txt"
-	local query
-	IFS='?' read -r path query <<< "$path"
-
-	# "././foo bar.txt"
-	path=$(urldecode "$path")
-
-	# "/foo bar.txt"
-	path=$(normalize-path "$path")
-
-	# "foo bar.txt"
-	path=${path:1}
-
-	# handle empty path (root path)
-	path=${path:-.}
-
-	# try to serve an index page
-	local totry=(
-		"$path"
-		"$path/index.html"
-		"$path/index.htm"
-	)
-	local try file
-	for try in "${totry[@]}"; do
-		if [[ -f $try ]]; then
-			file=$try
+		# connection close
+		if [[ -z ${REQ_INFO[method]} ]] then
+			echo "$keep_alive Client closed"
 			break
 		fi
-	done
 
-	if [[ -n $file ]]; then
-		# a static file was found!
-		local mime
-		mime=$(mime-type "$file")
+		# validate the request
+		[[ ${REQ_INFO[version]} == 'HTTP/1.1' ]] \
+		    || fatal 'unsupported HTTP version'
+		[[ ${REQ_INFO[method]} == 'GET' ]] \
+		    || fatal 'unsupported HTTP method'
+		[[ ${REQ_INFO[path]} == /* ]] \
+		    || fatal 'path must be absolute'
 
-		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
-		printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
-		printf '\r\n' >&"$fd"
-		tee < "$file" >&"$fd"
-	elif [[ -d $path ]]; then
-		# redirect to /path/ if directory requested without trailing slash
-		if [[ ${REQ_INFO[path]} != */ ]]; then
-			printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
-			printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
+		echo "$keep_alive ${REQ_INFO[method]} ${REQ_INFO[path]}"
+
+		# if we are here, we should reply to the caller
+		# "/././foo%20bar.txt?query=whatever"
+		local path="${REQ_INFO[path]}"
+
+		# "././foo%20bar.txt?query=whatever"
+		path=${path:1}
+
+		# "././foo%20bar.txt"
+		local query
+		IFS='?' read -r path query <<< "$path"
+
+		# "././foo bar.txt"
+		path=$(urldecode "$path")
+
+		# "/foo bar.txt"
+		path=$(normalize-path "$path")
+
+		# "foo bar.txt"
+		path=${path:1}
+
+		# handle empty path (root path)
+		path=${path:-.}
+
+		# try to serve an index page
+		local totry=(
+			"$path"
+			"$path/index.html"
+			"$path/index.htm"
+		)
+		local try file
+		for try in "${totry[@]}"; do
+			if [[ -f $try ]]; then
+				file=$try
+				break
+			fi
+		done
+
+		if [[ -n $file ]]; then
+			# a static file was found!
+			local mime=$(mime-type "$file")
+			# replace with a proper bash function
+			local len=$(wc -c "$file" | cut -d' ' -f1)
+
+			printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
+			printf 'Content-Type: %s\r\n' "$mime" >&"$fd"
+			printf 'Content-Length: %d\r\n' "$len" >&"$fd"
 			printf '\r\n' >&"$fd"
-			return
-		fi
+			tee < "$file" >&"$fd"
+		elif [[ -d $path ]]; then
+			# redirect to /path/ if directory requested without trailing slash
+			if [[ ${REQ_INFO[path]} != */ ]]; then
+				printf 'HTTP/1.1 301 Moved Permanently\r\n' >&"$fd"
+				printf 'Location: %s/\r\n' "${REQ_INFO[path]}" >&"$fd"
+				printf 'Content-Length: 0\r\n' >&"$fd"
+				printf '\r\n' >&"$fd"
+				return
+			fi
 
-		# try a directory listing
-		printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
-		printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
-		printf '\r\n' >&"$fd"
-		list-directory "$path" >&"$fd"
-	else
-		# nothing was found
-		printf 'HTTP/1.1 404 Not Found\r\n' >&"$fd"
-		printf '\r\n' >&"$fd"
-	fi
+			# try a directory listing
+			local listing=$(list-directory "$path")
+			local len=${#listing}
+			printf 'HTTP/1.1 200 OK\r\n' >&"$fd"
+			printf 'Content-Type: text/html; charset=utf-8\r\n' >&"$fd"
+			printf 'Content-Length: %d\r\n' "$len" >&"$fd"
+			printf '\r\n' >&"$fd"
+			list-directory "$path" >&"$fd"
+		else
+			# nothing was found
+			printf 'HTTP/1.1 404 Not Found\r\n' >&"$fd"
+			printf 'Content-Length: 0\r\n' >&"$fd"
+			printf '\r\n' >&"$fd"
+		fi
+	done
 }
 
 main() {
