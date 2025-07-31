@@ -19,6 +19,7 @@ Usage
 -----
 
 ```
+./bash-web-server -h
 ./bash-web-server [-p port] [-b addr] [-d dir]
 ```
 

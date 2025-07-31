@@ -9,9 +9,24 @@
 # Date: July 08, 2025
 # License: MIT
 
+VERSION='v1.0.2'
+
 PORT=8080
 ADDRESS='0.0.0.0'
 DIR='.'
+
+read -d '' -r USAGE <<- EOF
+Usage: bash-web-server [-p port] [-b addr] [-d dir]
+
+An HTTP server in Pure Bash.
+
+Options
+  -b <addr>  Address to bind to, defaults to 0.0.0.0.
+  -d <dir>   Directory to serve, defaults to your current directory.
+  -h         Print this message and exit.
+  -p <port>  Port to bind to, defaults to 8080.
+  -v         Print the version number and exit.
+EOF
 
 fatal() {
 	echo '[fatal]' "$@" >&2
@@ -75,14 +90,22 @@ list-directory() {
 	echo '<hr>'
 	echo '<ul>'
 	local f
-	for f in .. "$d"/*; do
+	# loop directories first (to put at top of list)
+	for f in .. "$d"/*/; do
+		local bname=${f%/}
+		bname=${bname##*/}
+
+		local display_name="📁 $bname/"
+		printf '<li><a href="%s">%s</a></li>\n' \
+			"$(urlencode "$bname")" \
+			"$(html-encode "$display_name")"
+	done
+	# loop regular files next (non-directories)
+	for f in "$d"/*; do
+		[[ -f $f ]] || continue
 		local bname=${f##*/}
-		local display_name
-		if [[ -d $f ]]; then
-			display_name="📁 $bname/"
-		else
-			display_name="📄 $bname"
-		fi
+
+		local display_name="📄 $bname"
 		printf '<li><a href="%s">%s</a></li>\n' \
 			"$(urlencode "$bname")" \
 			"$(html-encode "$display_name")"
@@ -265,12 +288,14 @@ main() {
 	enable tee # fallback to POSIX tee if not loadable
 
 	local OPTIND OPTARG opt
-	while getopts 'b:p:d:' opt; do
+	while getopts 'b:hp:d:v' opt; do
 		case "$opt" in
 			b) ADDRESS=$OPTARG;;
 			p) PORT=$OPTARG;;
 			d) DIR=$OPTARG;;
-			*) fatal "bad option";;
+			h) echo "$USAGE"; exit 0;;
+			v) echo "$VERSION"; exit 0;;
+			*) echo "$USAGE" >&2; exit 2;;
 		esac
 	done
 
