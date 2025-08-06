@@ -1,0 +1,65 @@
+# This was an idea to inline text-assets directly into the html before sending it.
+# So, if the html has a tag like <script src="test.js"></script>,
+# it would try to load test.js and insert it into the html.
+#
+# How to use/test it:
+# Instead of sending a file's content directly, you would need to check
+# its mime-type first as we want to only inline html.
+# After that you can convert the file's content using the inline-assets-function.
+#
+# In Code:
+# Copy the function below into the server file.
+# Replace:
+#   tee < "$file" >&"$fd"
+# With:
+#   if [[ $mime == 'text/html' ]]; then
+#     local content=$(tee < "$file")
+#     content=$(inline-assets "$content")
+#     echo "$content" >&"$fd"
+#   else
+#     tee < "$file" >&"$fd"
+#   fi
+
+inline-assets() {
+	local html=$1
+
+	local -A replacement=(
+		# inline stylesheets
+		["style||1"]="<link[^>]*rel=\"stylesheet\"[^>]*href=\"([^\"]+)\"[^>]*/?>"
+		["style||2"]="<link[^>]*href=\"([^\"]+)\"[^>]*rel=\"stylesheet\"[^>]*/?>"
+		# inline script
+		["script"]="<script[^>]*src=\"([^\"]+)\"[^>]*><\/script>"
+	)
+
+	for key in "${replacement[@]}"; do
+		local new_html=""
+
+		while [[ "$html" =~ ${replacement[${key}]} ]]; do
+			local tag="${BASH_REMATCH[0]}"
+			local raw_path="${BASH_REMATCH[1]}"
+			local before="${html%%$tag*}"
+			local after="${html#*$tag}"
+
+			local fixed_path=$(resolve-path "$raw_path")
+
+			if [[ ! -f "$fixed_path" ]]; then
+				new_html+="$before$tag"
+				html="$after"
+				continue
+			fi
+
+			local tag_name attr version
+			IFS='|' read -r tag_name attr version <<< "$key"
+
+			local content=$(tee < "$fixed_path")
+			# replace tag
+			local new_tag="<$tag_name original-path=\"$raw_path\">$content</$tag_name>"
+
+			new_html+="$before$new_tag"
+			html="$after"
+		done
+		html="$new_html$html"
+	done
+
+	echo "$html"
+}

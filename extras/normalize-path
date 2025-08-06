@@ -6,7 +6,7 @@ normalize-path() {
 	local parts
 	IFS='/' read -r -a parts <<< "$path"
 
-	local -a part
+	local part
 	local -a out=()
 	for part in "${parts[@]}"; do
 		case "$part" in
